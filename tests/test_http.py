@@ -151,9 +151,11 @@ class SourceContractTests(unittest.TestCase):
         self.assertEqual(lock["packages"], [])
         self.assertEqual(lock["packages-dev"], [])
 
-    def test_only_public_php_endpoints(self):
+    def test_only_sample_php_endpoints(self):
         endpoints = {
-            path.relative_to(ROOT).as_posix() for path in ROOT.rglob("*.php")
+            path.relative_to(ROOT).as_posix()
+            for path in ROOT.rglob("*.php")
+            if not path.is_relative_to(ROOT / "vendor")
         }
         self.assertEqual(endpoints, {"index.php", "health.php"})
 

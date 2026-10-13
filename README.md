@@ -40,7 +40,7 @@ No dependency installation is needed to run the app locally. Keep
 
 The tests start and stop their own PHP development servers on OS-assigned
 loopback ports. They check exact HTTP bodies/statuses, greeting configuration,
-and the source contract. All tests are Python files under `tests/`; the only
+and the source contract. All tests are Python files under `tests/`; the sample's
 PHP endpoints are `index.php` and `health.php`. If PHP 8.5 is not the default
 `php` on your PATH, run the tests with `PHP_BIN=/path/to/php`.
 
