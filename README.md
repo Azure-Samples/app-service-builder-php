@@ -4,6 +4,8 @@ A dependency-free PHP 8.5 web app for learning the App Service Builder
 GitHub-source workflow. The app, Composer project, and `builder.yaml` are at
 the repository root; no other sample repository or external service is needed.
 The greeting includes the PHP runtime version to demonstrate PHP execution.
+An optional editorial-style showcase at `/demo` displays the same public
+greeting and runtime version. The original plain-text endpoints stay unchanged.
 
 **App Service Builder is in Private Preview. Use this sample for development
 and testing, not production.** Local checks do not qualify the hosted build,
@@ -30,6 +32,7 @@ cd app-service-builder-php
 composer validate --strict --no-check-publish
 php -l index.php
 php -l health.php
+php -l demo/index.php
 python3 -m unittest discover -s tests -v
 php -S 127.0.0.1:0 -t .
 ```
@@ -40,8 +43,9 @@ No dependency installation is needed to run the app locally. Keep
 
 The tests start and stop their own PHP development servers on OS-assigned
 loopback ports. They check exact HTTP bodies/statuses, greeting configuration,
-and the source contract. All tests are Python files under `tests/`; the sample's
-PHP endpoints are `index.php` and `health.php`. If PHP 8.5 is not the default
+and the source contract, plus the showcase's routes and HTML escaping. All tests
+are Python files under `tests/`; the sample's PHP entry points are `index.php`,
+`health.php`, and `demo/index.php`. If PHP 8.5 is not the default
 `php` on your PATH, run the tests with `PHP_BIN=/path/to/php`.
 
 The final command starts a **local development fixture only**, not the hosted
@@ -64,6 +68,26 @@ curl -i "<local-url>/health.php"
 `8.5.x` represents the actual PHP patch version. Successful response bodies
 end with exactly one newline by default; the health body is exactly
 `healthy\n`. Stop the development server with **Ctrl+C**.
+
+### Open the visual showcase
+
+Open `<local-url>/demo` for the responsive, terracotta PHP showcase used for
+template previews. It renders the real `GREETING` value and PHP runtime version,
+with links to the original plain-text greeting, health endpoint, source, and
+quickstart. Greeting text is HTML-escaped; it cannot add markup or scripts.
+There are no fonts, scripts, images, or packages to download at runtime.
+
+The showcase is a normal directory entry point at `demo/index.php`; `/demo/`
+and `/demo/index.php` also work locally. It needs no router, rewrite, custom
+build command, or startup override. It relies on the server's standard
+directory-index handling. Hosted directory routing remains unqualified until
+a live deployment is checked. If the hosted server does not resolve `/demo`,
+check `/demo/index.php` and the server logs rather than changing the root
+greeting or replacing nginx/PHP-FPM.
+
+The routes in the table above keep their exact plain-text responses; `/demo`
+is additive and returns `text/html; charset=utf-8`. The showcase does not claim
+that a hosted deployment or health check has succeeded.
 
 ## Deploy your fork with Portal
 
@@ -106,6 +130,7 @@ the HTTP listener. **There is deliberately no `run.start`**: do not add
 `php -S`, stop nginx, or add startup workarounds. The root Composer project
 supports the platform's Oryx detection/build path without runtime packages.
 There is no custom build command or output directory.
+Keep the `demo/` directory alongside the root endpoints when packaging source.
 
 The repository/source root is a **filesystem directory**. The component's
 default public mount `/` is a **URL path**, not a directory to select in

@@ -5,12 +5,32 @@ import selectors
 import subprocess
 import unittest
 from contextlib import contextmanager
+from html.parser import HTMLParser
 from http.client import HTTPConnection
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PHP = os.environ.get("PHP_BIN", "php")
+
+
+class DemoParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.greeting = []
+        self.in_greeting = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "span" and ("class", "greeting") in attrs:
+            self.in_greeting = True
+
+    def handle_endtag(self, tag):
+        if tag == "span":
+            self.in_greeting = False
+
+    def handle_data(self, data):
+        if self.in_greeting:
+            self.greeting.append(data)
 
 
 @contextmanager
@@ -129,6 +149,63 @@ class HTTPTests(unittest.TestCase):
         with development_server() as server:
             self.assert_response(server, "/health.php", 200, "", method="HEAD")
 
+    def assert_demo(self, server, path, greeting, method="GET"):
+        process, port = server
+        self.assertIsNone(process.poll())
+        connection = HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            connection.request(method, path)
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(
+                response.getheader("Content-Type"), "text/html; charset=utf-8"
+            )
+            content = response.read().decode("utf-8")
+        finally:
+            connection.close()
+        if method == "HEAD":
+            self.assertEqual(content, "")
+            return
+        parser = DemoParser()
+        parser.feed(content)
+        self.assertEqual("".join(parser.greeting), greeting)
+        self.assertIn(f'<span class="runtime-version">{self.version}</span>', content)
+        self.assertIn('href="/"', content)
+        self.assertIn('href="/health.php"', content)
+        self.assertNotIn("not-part-of-the-response", content)
+        return content
+
+    def test_demo_routes(self):
+        with development_server() as server:
+            for path in ("/demo", "/demo/", "/demo/index.php", "/demo?GREETING=ignored"):
+                with self.subTest(path=path):
+                    self.assert_demo(server, path, "Hello")
+
+    def test_demo_greeting_configuration(self):
+        for value, expected in ((None, "Hello"), ("", "Hello"), ("Welcome", "Welcome"),
+                                ("0", "0"), (" ", " ")):
+            with self.subTest(greeting=value), development_server(value) as server:
+                self.assert_demo(server, "/demo", expected)
+                self.assert_response(server, "/", 200, self.greeting(expected))
+                self.assert_response(server, "/health.php", 200, "healthy\n")
+
+    def test_demo_escapes_public_greeting(self):
+        greeting = 'Caf\u00e9 <script>alert("sample")</script> & \'friends\''
+        with development_server(greeting) as server:
+            content = self.assert_demo(server, "/demo", greeting)
+            self.assertNotIn("<script>", content)
+            self.assertIn("&lt;script&gt;", content)
+            self.assertIn("&amp;", content)
+            self.assert_response(server, "/", 200, self.greeting(greeting))
+
+    def test_demo_head(self):
+        with development_server() as server:
+            self.assert_demo(server, "/demo", "Hello", method="HEAD")
+
+    def test_unknown_demo_path(self):
+        with development_server() as server:
+            self.assert_response(server, "/demo/not-found", 404, "Not found\n")
+
 
 class SourceContractTests(unittest.TestCase):
     def test_minimal_hosted_manifest(self):
@@ -157,7 +234,7 @@ class SourceContractTests(unittest.TestCase):
             for path in ROOT.rglob("*.php")
             if not path.is_relative_to(ROOT / "vendor")
         }
-        self.assertEqual(endpoints, {"index.php", "health.php"})
+        self.assertEqual(endpoints, {"index.php", "health.php", "demo/index.php"})
 
 
 if __name__ == "__main__":
